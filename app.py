@@ -1,4 +1,12 @@
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+
+# optional extra imports below
+# import ta  # (you removed this earlier)
+
 st.set_page_config(page_title="Stock Signal Dashboard", page_icon="💹", layout="wide")
+
 st.markdown(
     """
     <h1 style='text-align: center; color: #0A2A66; font-size: 40px;'>
@@ -12,13 +20,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-import yfinance as yf
-import pandas as pd
-import streamlit as st
-import ta
-st_autorefresh = st.experimental_rerun if False else None
-st.set_page_config(page_title="Stock Buy Signals", page_icon="📈", layout="centered")
-st.title("📈 Simple Stock Buy Signals")
 
 SYMBOLS = [
     "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA",
