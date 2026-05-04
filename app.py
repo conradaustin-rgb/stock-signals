@@ -2,7 +2,8 @@ import yfinance as yf
 import pandas as pd
 import streamlit as st
 import ta
-
+st_autorefresh = st.experimental_rerun if False else None
+st.set_page_config(page_title="Stock Buy Signals", page_icon="📈", layout="centered")
 st.title("📈 Simple Stock Buy Signals")
 
 SYMBOLS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA"]
