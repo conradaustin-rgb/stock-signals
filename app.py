@@ -56,8 +56,8 @@ else:
     st.success("✅ Possible Buy Signals:")
     st.dataframe(df)
 
-# Simple timed auto-refresh (every 24 hours)
-st_autorefresh = st.experimental_singleton  # placeholder, harmless
-st.sidebar.info("🔁 Refresh the page daily to fetch new data.")
+# --- End of app ---
+st.sidebar.info("🔁 Tip: reload this page each day to get fresh data.")
+
 
 
