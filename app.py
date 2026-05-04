@@ -1,16 +1,17 @@
-# -----------------  IMPORTS  -----------------
+# =================  IMPORTS  =================
 import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# -----------------  PAGE SETUP  -----------------
+
+# =================  PAGE SETUP  =================
 st.set_page_config(
     page_title="Stock Signal Dashboard",
     page_icon="💹",
     layout="wide"
 )
 
-# -----------------  STYLING  -----------------
+# =================  STYLING  =================
 st.markdown("""
     <style>
         body {
@@ -43,20 +44,24 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# -----------------  HEADER  -----------------
+
+# =================  HEADER  =================
 st.markdown("""
 <h1>💹 Stock Signal Dashboard</h1>
 <h4>Daily Technical & Analyst Insights for Your Watchlist</h4>
 <hr/>
 """, unsafe_allow_html=True)
 
-# -----------------  PARAMETERS  -----------------
+
+# =================  PARAMETERS  =================
 SYMBOLS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA", "META", "NFLX"]
 SHORT_MA = 20
 LONG_MA = 50
 
-# -----------------  RSI FUNCTION  -----------------
+
+# =================  RSI FUNCTION  =================
 def calc_rsi(series, period=14):
+    """Calculate RSI without any external libraries."""
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
@@ -66,7 +71,8 @@ def calc_rsi(series, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-# -----------------  MAIN SIGNAL FUNCTION  -----------------
+
+# =================  MAIN SIGNAL FUNCTION  =================
 def get_signals():
     results = []
 
@@ -86,6 +92,7 @@ def get_signals():
                 continue
             latest = df.iloc[-1]
 
+            # Analyst data
             ticker = yf.Ticker(symbol)
             info = ticker.info
             recommend = info.get("recommendationMean", None)
@@ -96,6 +103,7 @@ def get_signals():
             else:
                 recommend, upside = None, None
 
+            # BUY signal logic
             if (
                 latest["ma_short"] > latest["ma_long"]
                 and latest["rsi"] < 50
@@ -114,16 +122,19 @@ def get_signals():
 
     return pd.DataFrame(results)
 
-# -----------------  RUN APP  -----------------
+
+# =================  RUN APP  =================
 try:
     df = get_signals()
 except Exception as e:
     st.error(f"Problem generating signals: {e}")
     df = None
 
+
+# =================  DISPLAY RESULTS  =================
 if df is None or df.empty:
     st.markdown("### ❗ No qualifying BUY signals today")
-    st.caption("Technical criteria not met — showing raw RSI data for transparency.")
+    st.caption("Technical criteria not met — displaying current RSI values instead.")
 
     placeholder_rows = []
     for symbol in SYMBOLS:
@@ -139,28 +150,33 @@ if df is None or df.empty:
         })
 
     if placeholder_rows:
-        styled = (
-            pd.DataFrame(placeholder_rows)
-            .style.background_gradient(subset=["RSI"], cmap="RdYlGn_r")
+        df_show = pd.DataFrame(placeholder_rows)
+        num_cols = df_show.select_dtypes("number").columns
+        style = (
+            df_show.style
+            .background_gradient(subset=num_cols, cmap="RdYlGn_r")
             .format({"Price": "${:,.2f}", "RSI": "{:.1f}"})
         )
-        st.dataframe(styled, use_container_width=True)
+        st.dataframe(style, use_container_width=True)
 else:
     st.markdown("### ✅ Potential BUY Opportunities")
-    styled = (
-        df.style.background_gradient(
-            subset=["RSI", "Target Upside %"], cmap="RdYlGn_r"
-        )
+    df_show = df.copy()
+    num_cols = df_show.select_dtypes("number").columns
+    style = (
+        df_show.style
+        .background_gradient(subset=num_cols, cmap="RdYlGn_r")
         .format({
             "Close Price": "${:,.2f}",
             "RSI": "{:.1f}",
             "Target Upside %": "{:.1f}",
         })
     )
-    st.dataframe(styled, use_container_width=True)
+    st.dataframe(style, use_container_width=True)
 
+
+# =================  SIDEBAR INFO  =================
 st.sidebar.markdown("### ⚙️ Settings")
-st.sidebar.caption("Reload this page once a day after market close for the latest signals.")
+st.sidebar.caption("Reload this app daily after market close for fresh data.")
 
 
 
