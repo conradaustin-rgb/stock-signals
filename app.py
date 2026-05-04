@@ -33,15 +33,15 @@ def calc_rsi(series, period=14):
 
 # ---------- MAIN SIGNAL GENERATOR ----------
 def get_signals():
-    results = []
+    rows = []
 
     for symbol in SYMBOLS:
         try:
-            df = yf.download(symbol, period="6mo", interval="1d", progress=False)
+            df = yf.download(symbol, period="1y", interval="1d", progress=False)
             if df.empty or "Close" not in df.columns:
                 continue
 
-            # --- Technical calculations ---
+            # --- Technical indicators ---
             df["rsi"] = calc_rsi(df["Close"])
             df["ma_short"] = df["Close"].rolling(SHORT_MA).mean()
             df["ma_long"] = df["Close"].rolling(LONG_MA).mean()
@@ -49,26 +49,26 @@ def get_signals():
             df.dropna(inplace=True)
             if df.empty:
                 continue
-            latest = df.iloc[-1]
+            last = df.iloc[-1]
 
-            # --- Fundamental & sentiment data ---
+            # --- Analyst & fundamentals ---
             info = yf.Ticker(symbol).info
-            recommend = info.get("recommendationMean")
-            target_price = info.get("targetMeanPrice")
-            pe_ratio = info.get("forwardPE")
-            profit_margin = info.get("profitMargins")
+            recommend = info.get("recommendationMean") or None
+            target_price = info.get("targetMeanPrice") or None
+            pe_ratio = info.get("forwardPE") or None
+            profit_margin = info.get("profitMargins") or None
 
-            current_price = latest["Close"]
+            price = last["Close"]
             upside = None
             if target_price:
-                upside = round(((target_price - current_price) / current_price) * 100, 1)
+                upside = round(((target_price - price) / price) * 100, 1)
 
-            # --- Derived technical flags ---
-            ma_cross = latest["ma_short"] > latest["ma_long"]
-            low_rsi = latest["rsi"] < 50
-            high_volume = latest["Volume"] > 1.5 * latest["avg_vol"]
+            # --- Technical flags ---
+            ma_cross = last["ma_short"] > last["ma_long"]
+            low_rsi = last["rsi"] < 55
+            high_volume = last["Volume"] > 1.5 * last["avg_vol"]
 
-            # --- Scoring system ---
+            # --- Scoring (0–7) ---
             score = 0
             if ma_cross: score += 1
             if low_rsi: score += 1
@@ -78,14 +78,14 @@ def get_signals():
             if pe_ratio and pe_ratio < 35: score += 1
             if profit_margin and profit_margin > 0.05: score += 1
 
-            decision = "BUY" if score >= 4 else "WATCH"
+            decision = "BUY" if score >= 3 else "WATCH"
 
-            results.append({
+            rows.append({
                 "Symbol": symbol,
-                "Close Price": round(current_price, 2),
-                "RSI": round(latest["rsi"], 1),
-                "10‑Day Avg Vol": int(latest["avg_vol"]),
-                "Today Vol": int(latest["Volume"]),
+                "Close Price": round(price, 2),
+                "RSI": round(last["rsi"], 1),
+                "10‑Day Avg Vol": int(last["avg_vol"]),
+                "Today Vol": int(last["Volume"]),
                 "High Volume?": "✅" if high_volume else "",
                 "Analyst Rating (1=Buy→5=Sell)": recommend,
                 "Target Upside %": upside,
@@ -98,38 +98,48 @@ def get_signals():
         except Exception:
             continue
 
-    return pd.DataFrame(results)
+    return pd.DataFrame(rows)
 
 
 # ---------- RUN APP ----------
+df = pd.DataFrame()
 try:
     df = get_signals()
 except Exception as e:
-    st.error(f"Problem generating signals: {e}")
-    df = pd.DataFrame()
-
+    st.error(f"Couldn't load data: {e}")
 
 # ---------- DISPLAY ----------
 if df.empty:
-    st.subheader("No data available right now.")
+    st.warning("No data available right now — showing basic RSI for reference.")
+    backup = []
+    for s in SYMBOLS:
+        data = yf.download(s, period="6mo", interval="1d", progress=False)
+        if data.empty:
+            continue
+        data["rsi"] = calc_rsi(data["Close"])
+        latest = data.iloc[-1]
+        backup.append({"Symbol": s, "Price": round(latest["Close"], 2), "RSI": round(latest["rsi"], 1)})
+    if backup:
+        st.dataframe(pd.DataFrame(backup), use_container_width=True)
 else:
-    st.subheader("📊 Combined Technical + Fundamental Signals")
+    st.subheader("📊 Combined Indicators & Scores")
     df_sorted = df.sort_values(by="Score", ascending=False)
     st.dataframe(df_sorted, use_container_width=True)
 
-    buy_candidates = df_sorted[df_sorted["Signal"] == "BUY"]
-    if not buy_candidates.empty:
-        st.success(f"✅ {len(buy_candidates)} Potential BUY Opportunities Detected")
+    buy_df = df_sorted[df_sorted["Signal"] == "BUY"]
+    if not buy_df.empty:
+        st.success(f"✅ {len(buy_df)} Potential BUY Opportunities Detected")
         st.table(
-            buy_candidates[
+            buy_df[
                 ["Symbol", "Close Price", "RSI", "Target Upside %", "Score", "Signal"]
-            ]
+            ].reset_index(drop=True)
         )
     else:
-        st.info("No BUY signals met all criteria today.")
+        st.info("No active BUY signals — revisit after the next trading session.")
 
 st.sidebar.header("⚙️ Settings")
-st.sidebar.write("Reload after market close for updated indicators.")
+st.sidebar.write("Reload after market close (approx 9 PM UTC) for updated data.")
+
 
 
 
