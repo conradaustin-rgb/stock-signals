@@ -93,25 +93,32 @@ def get_signals():
     return pd.DataFrame(results)
 
 df = get_signals()
-
 if df.empty:
-    st.warning("No stocks met the full BUY criteria, showing RSI values for all instead:")
-
-    rows = []
+    st.markdown("### ❗ No qualifying BUY signals today", unsafe_allow_html=True)
+    st.caption("Technical criteria not met — showing raw RSI data for transparency.")
+    placeholder_rows = []
     for symbol in SYMBOLS:
-        df_temp = yf.download(symbol, period="6mo", interval="1d", progress=False)
-        if df_temp.empty:
+        data = yf.download(symbol, period="6mo", interval="1d", progress=False)
+        if data.empty:
             continue
-# ---- Function to calculate RSI (avoids ta library errors) ----
-def calc_rsi(series, period=14):
-    delta = series.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(window=period).mean()
-    avg_loss = loss.rolling(window=period).mean()
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    return rsi
+        data["rsi"] = calc_rsi(data["Close"])
+        last = data.iloc[-1]
+        placeholder_rows.append({
+            "Symbol": symbol,
+            "Price": round(last["Close"], 2),
+            "RSI": round(last["rsi"], 1)
+        })
+    if placeholder_rows:
+        styled = pd.DataFrame(placeholder_rows).style.background_gradient(
+            subset=["RSI"], cmap="RdYlGn_r"
+        ).format({"Price": "${:,.2f}", "RSI": "{:.1f}"})
+        st.dataframe(styled, use_container_width=True)
+else:
+    st.markdown("### ✅ Potential BUY Opportunities")
+    styled = df.style.background_gradient(
+        subset=["RSI", "Target Upside %"], cmap="RdYlGn_r"
+    ).format({"Close Price": "${:,.2f}", "RSI": "{:.1f}", "Target Upside %": "{:.1f}"})
+    st.dataframe(styled, use_container_width=True)
 
 # ---- Display results ----
 df = get_signals()
