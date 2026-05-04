@@ -6,19 +6,44 @@ import pandas as pd
 # import ta  # (you removed this earlier)
 
 st.set_page_config(page_title="Stock Signal Dashboard", page_icon="💹", layout="wide")
-
-st.markdown(
-    """
-    <h1 style='text-align: center; color: #0A2A66; font-size: 40px;'>
-        💹 Stock Signal Dashboard
-    </h1>
-    <h4 style='text-align: center; color: #555555;'>
-        Daily Technical & Analyst Insights for Your Watchlist
-    </h4>
-    <hr style='border: 1px solid #0A2A66;'/>
-    """,
-    unsafe_allow_html=True
-)
+# --- Custom style overrides ---
+st.markdown("""
+    <style>
+        body {
+            background-color: #f9fafc;
+            color: #0a1a33;
+            font-family: 'Inter', sans-serif;
+        }
+        .main {
+            padding: 2rem 3rem;
+        }
+        h1 {
+            text-align: center;
+            color: #0A2A66;
+            font-size: 42px;
+            margin-bottom: 0;
+        }
+        h4 {
+            text-align: center;
+            color: #4b5563;
+            margin-top: 4px;
+        }
+        hr {
+            border: 1px solid #0A2A66;
+            margin: 1.5rem 0;
+        }
+        .stAlert {
+            font-size: 15px !important;
+            border-radius: 6px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+# --- Title Banner ---
+st.markdown("""
+<h1>💹 Stock Signal Dashboard</h1>
+<h4>Daily Technical & Analyst Insights for Your Watchlist</h4>
+<hr/>
+""", unsafe_allow_html=True)
 
 
 SYMBOLS = [
@@ -113,8 +138,9 @@ else:
     st.success("✅ Possible Buy Signals:")
     st.dataframe(df)
 
-st.sidebar.info("🔁 Tip: reload this page each day to get fresh data.")
 
+st.sidebar.markdown("### ⚙️ Settings")
+st.sidebar.caption("Reload once daily for fresh data.")
 
 
 # --- End of app ---
