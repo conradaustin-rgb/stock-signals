@@ -62,32 +62,43 @@ if df.empty:
         df_temp = yf.download(symbol, period="6mo", interval="1d", progress=False)
         if df_temp.empty:
             continue
-try:
-    close_series = df_temp["Close"]
-    if isinstance(close_series, pd.DataFrame):
-        close_series = close_series.iloc[:, 0]
+# ---- Function to calculate RSI (avoids ta library errors) ----
 def calc_rsi(series, period=14):
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(period).mean()
-    avg_loss = loss.rolling(period).mean()
+    avg_gain = gain.rolling(window=period).mean()
+    avg_loss = loss.rolling(window=period).mean()
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
     return rsi
-df_temp["rsi"] = calc_rsi(df_temp["Close"])
-except Exception as e:
-    st.warning(f"Could not compute RSI for {symbol}: {e}")
-    df_temp["rsi"] = None
 
+# ---- Display results ----
+df = get_signals()
+
+if df.empty:
+    st.warning("No stocks met the full BUY criteria, showing RSI values for all instead:")
+
+    rows = []
+    for symbol in SYMBOLS:
+        df_temp = yf.download(symbol, period="6mo", interval="1d", progress=False)
+        if df_temp.empty:
+            continue
+        df_temp["rsi"] = calc_rsi(df_temp["Close"])
         last = df_temp.iloc[-1]
-        rows.append({"Symbol": symbol, "RSI": round(last["rsi"], 1), "Price": round(last["Close"], 2)})
+        rows.append({
+            "Symbol": symbol,
+            "Price": round(last["Close"], 2),
+            "RSI": round(last["rsi"], 1)
+        })
 
     if rows:
         st.dataframe(pd.DataFrame(rows))
 else:
-    st.success("✅ Possible Buy Signals:")
+    st.success("✅ Possible Buy Signals:")
     st.dataframe(df)
+
+st.sidebar.info("🔁 Tip: reload this page each day to get fresh data.")
 
 
 
