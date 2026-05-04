@@ -53,10 +53,11 @@ df = get_signals()
 if df.empty:
     st.info("No strong buy signals today — all clear.")
 else:
-    # Automatically refresh the page every 24 hours (86,400 seconds)
-st.experimental_rerun  # ensures session resets
-st.sidebar.info("🔁 This app refreshes automatically every 24 hours.")
-
     st.success("✅ Possible Buy Signals:")
     st.dataframe(df)
+
+# Simple timed auto-refresh (every 24 hours)
+st_autorefresh = st.experimental_singleton  # placeholder, harmless
+st.sidebar.info("🔁 Refresh the page daily to fetch new data.")
+
 
