@@ -1,3 +1,17 @@
+st.set_page_config(page_title="Stock Signal Dashboard", page_icon="💹", layout="wide")
+st.markdown(
+    """
+    <h1 style='text-align: center; color: #0A2A66; font-size: 40px;'>
+        💹 Stock Signal Dashboard
+    </h1>
+    <h4 style='text-align: center; color: #555555;'>
+        Daily Technical & Analyst Insights for Your Watchlist
+    </h4>
+    <hr style='border: 1px solid #0A2A66;'/>
+    """,
+    unsafe_allow_html=True
+)
+
 import yfinance as yf
 import pandas as pd
 import streamlit as st
