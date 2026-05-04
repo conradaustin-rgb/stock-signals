@@ -54,6 +54,15 @@ def get_signals():
 
 df = get_signals()
 
+info = yf.Ticker(symbol).info
+recommend = info.get("recommendationMean", None)
+target_price = info.get("targetMeanPrice", None)
+current_price = df["Close"].iloc[-1]
+if recommend and target_price:
+    upside = round(((target_price - current_price) / current_price) * 100, 1)
+else:
+    recommend, upside = None, None
+
 if df.empty:
     st.info("No strong buy signals today — all clear.")
 else:
