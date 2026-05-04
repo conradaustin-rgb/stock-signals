@@ -6,7 +6,11 @@ st_autorefresh = st.experimental_rerun if False else None
 st.set_page_config(page_title="Stock Buy Signals", page_icon="📈", layout="centered")
 st.title("📈 Simple Stock Buy Signals")
 
-SYMBOLS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA"]
+SYMBOLS = [
+    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA",
+    "META", "NFLX", "BABA", "AMD", "INTC"
+]
+
 SHORT_MA = 20
 LONG_MA = 50
 
