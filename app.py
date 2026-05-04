@@ -11,27 +11,47 @@ LONG_MA = 50
 
 def get_signals():
     results = []
+
     for symbol in SYMBOLS:
-        df = yf.download(symbol, period="90d")
-        df["rsi"] = ta.momentum.RSIIndicator(df["Close"], window=14).rsi()
-        df["ma_short"] = df["Close"].rolling(SHORT_MA).mean()
-        df["ma_long"] = df["Close"].rolling(LONG_MA).mean()
-        latest = df.iloc[-1]
-        if (
-            latest["ma_short"] > latest["ma_long"]
-            and latest["rsi"] < 40
-            and latest["Close"] > latest["ma_short"]
-        ):
-            results.append({
-                "Symbol": symbol,
-                "Close": round(latest["Close"], 2),
-                "RSI": round(latest["rsi"], 1),
-            })
+        try:
+            df = yf.download(symbol, period="6mo", interval="1d", progress=False)
+            if df.empty or "Close" not in df.columns:
+                continue
+
+            # Clean data and drop missing values
+            df = df.dropna(subset=["Close"])
+            df["rsi"] = ta.momentum.RSIIndicator(close=df["Close"], window=14).rsi()
+            df["ma_short"] = df["Close"].rolling(SHORT_MA).mean()
+            df["ma_long"] = df["Close"].rolling(LONG_MA).mean()
+
+            df = df.dropna()  # remove initial NaNs
+            if df.empty:
+                continue
+
+            latest = df.iloc[-1]
+
+            if (
+                latest["ma_short"] > latest["ma_long"]
+                and latest["rsi"] < 40
+                and latest["Close"] > latest["ma_short"]
+            ):
+                results.append({
+                    "Symbol": symbol,
+                    "Close Price": round(latest["Close"], 2),
+                    "RSI": round(latest["rsi"], 1),
+                    "Short MA": round(latest["ma_short"], 2),
+                    "Long MA": round(latest["ma_long"], 2)
+                })
+        except Exception as e:
+            st.warning(f"Skipped {symbol} due to data issue: {e}")
+
     return pd.DataFrame(results)
 
 df = get_signals()
+
 if df.empty:
-    st.info("No strong buy signals today.")
+    st.info("No strong buy signals today — all clear.")
 else:
-    st.success("Possible Buy Signals:")
+    st.success("✅ Possible Buy Signals:")
     st.dataframe(df)
+
