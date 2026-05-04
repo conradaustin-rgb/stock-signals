@@ -52,54 +52,26 @@ def get_signals():
 
     return pd.DataFrame(results)
 
-def get_signals():
-    results = []
+df = get_signals()
 
+if df.empty:
+    st.warning("No stocks met the full BUY criteria, showing RSI values for all instead:")
+
+    rows = []
     for symbol in SYMBOLS:
-        try:
-            df = yf.download(symbol, period="6mo", interval="1d", progress=False)
-            if df.empty or "Close" not in df.columns:
-                continue
+        df_temp = yf.download(symbol, period="6mo", interval="1d", progress=False)
+        if df_temp.empty:
+            continue
+        df_temp["rsi"] = ta.momentum.RSIIndicator(close=df_temp["Close"], window=14).rsi()
+        last = df_temp.iloc[-1]
+        rows.append({"Symbol": symbol, "RSI": round(last["rsi"], 1), "Price": round(last["Close"], 2)})
 
-            # ---- Technical indicators ----
-            df = df.dropna(subset=["Close"])
-            df["rsi"] = ta.momentum.RSIIndicator(close=df["Close"], window=14).rsi()
-            df["ma_short"] = df["Close"].rolling(SHORT_MA).mean()
-            df["ma_long"] = df["Close"].rolling(LONG_MA).mean()
-            df = df.dropna()
-            if df.empty:
-                continue
-            latest = df.iloc[-1]
+    if rows:
+        st.dataframe(pd.DataFrame(rows))
+else:
+    st.success("✅ Possible Buy Signals:")
+    st.dataframe(df)
 
-            # ---- Analyst data from Yahoo ----
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            recommend = info.get("recommendationMean", None)
-            target_price = info.get("targetMeanPrice", None)
-            current_price = latest["Close"]
-            if recommend and target_price:
-                upside = round(((target_price - current_price) / current_price) * 100, 1)
-            else:
-                recommend, upside = None, None
-
-            # ---- Combine technical + analyst filters ----
-            if (
-                latest["ma_short"] > latest["ma_long"]
-                and latest["rsi"] < 40
-                and latest["Close"] > latest["ma_short"]
-            ):
-                results.append({
-                    "Symbol": symbol,
-                    "Close Price": round(latest["Close"], 2),
-                    "RSI": round(latest["rsi"], 1),
-                    "Analyst Rating (1=Buy→5=Sell)": recommend,
-                    "Target Upside %": upside
-                })
-
-        except Exception as e:
-            st.warning(f"Skipped {symbol}: {e}")
-
-    return pd.DataFrame(results)
 
 
 # --- End of app ---
