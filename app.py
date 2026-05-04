@@ -1,12 +1,16 @@
+# -----------------  IMPORTS  -----------------
 import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# optional extra imports below
-# import ta  # (you removed this earlier)
+# -----------------  PAGE SETUP  -----------------
+st.set_page_config(
+    page_title="Stock Signal Dashboard",
+    page_icon="💹",
+    layout="wide"
+)
 
-st.set_page_config(page_title="Stock Signal Dashboard", page_icon="💹", layout="wide")
-# --- Custom style overrides ---
+# -----------------  STYLING  -----------------
 st.markdown("""
     <style>
         body {
@@ -38,27 +42,21 @@ st.markdown("""
         }
     </style>
     """, unsafe_allow_html=True)
-# --- Title Banner ---
+
+# -----------------  HEADER  -----------------
 st.markdown("""
 <h1>💹 Stock Signal Dashboard</h1>
-<h4>Daily Technical & Analyst Insights for Your Watchlist</h4>
+<h4>Daily Technical & Analyst Insights for Your Watchlist</h4>
 <hr/>
 """, unsafe_allow_html=True)
 
-
-SYMBOLS = [
-    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA",
-    "META", "NFLX", "BABA", "AMD", "INTC"
-]
-
+# -----------------  PARAMETERS  -----------------
+SYMBOLS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA", "META", "NFLX"]
 SHORT_MA = 20
 LONG_MA = 50
 
-def get_signals():
-    results = []
-# ---- Function to calculate RSI (safe basic version) ----
+# -----------------  RSI FUNCTION  -----------------
 def calc_rsi(series, period=14):
-    import pandas as pd
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
@@ -68,45 +66,65 @@ def calc_rsi(series, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
+# -----------------  MAIN SIGNAL FUNCTION  -----------------
+def get_signals():
+    results = []
+
     for symbol in SYMBOLS:
         try:
             df = yf.download(symbol, period="6mo", interval="1d", progress=False)
             if df.empty or "Close" not in df.columns:
+                st.warning(f"Skipped {symbol} due to data issue.")
                 continue
 
-            # Clean data and drop missing values
             df = df.dropna(subset=["Close"])
-            df["rsi"] = ta.momentum.RSIIndicator(close=df["Close"], window=14).rsi()
+            df["rsi"] = calc_rsi(df["Close"])
             df["ma_short"] = df["Close"].rolling(SHORT_MA).mean()
             df["ma_long"] = df["Close"].rolling(LONG_MA).mean()
-
-            df = df.dropna()  # remove initial NaNs
+            df = df.dropna()
             if df.empty:
                 continue
-
             latest = df.iloc[-1]
+
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            recommend = info.get("recommendationMean", None)
+            target_price = info.get("targetMeanPrice", None)
+            current_price = latest["Close"]
+            if recommend and target_price:
+                upside = round(((target_price - current_price) / current_price) * 100, 1)
+            else:
+                recommend, upside = None, None
 
             if (
                 latest["ma_short"] > latest["ma_long"]
-                and latest["rsi"] < 40
+                and latest["rsi"] < 50
                 and latest["Close"] > latest["ma_short"]
             ):
                 results.append({
                     "Symbol": symbol,
                     "Close Price": round(latest["Close"], 2),
                     "RSI": round(latest["rsi"], 1),
-                    "Short MA": round(latest["ma_short"], 2),
-                    "Long MA": round(latest["ma_long"], 2)
+                    "Analyst Rating (1=Buy→5=Sell)": recommend,
+                    "Target Upside %": upside
                 })
+
         except Exception as e:
-            st.warning(f"Skipped {symbol} due to data issue: {e}")
+            st.warning(f"Skipped {symbol}: {e}")
 
     return pd.DataFrame(results)
 
-df = get_signals()
-if df.empty:
-    st.markdown("### ❗ No qualifying BUY signals today", unsafe_allow_html=True)
+# -----------------  RUN APP  -----------------
+try:
+    df = get_signals()
+except Exception as e:
+    st.error(f"Problem generating signals: {e}")
+    df = None
+
+if df is None or df.empty:
+    st.markdown("### ❗ No qualifying BUY signals today")
     st.caption("Technical criteria not met — showing raw RSI data for transparency.")
+
     placeholder_rows = []
     for symbol in SYMBOLS:
         data = yf.download(symbol, period="6mo", interval="1d", progress=False)
@@ -119,50 +137,31 @@ if df.empty:
             "Price": round(last["Close"], 2),
             "RSI": round(last["rsi"], 1)
         })
+
     if placeholder_rows:
-        styled = pd.DataFrame(placeholder_rows).style.background_gradient(
-            subset=["RSI"], cmap="RdYlGn_r"
-        ).format({"Price": "${:,.2f}", "RSI": "{:.1f}"})
+        styled = (
+            pd.DataFrame(placeholder_rows)
+            .style.background_gradient(subset=["RSI"], cmap="RdYlGn_r")
+            .format({"Price": "${:,.2f}", "RSI": "{:.1f}"})
+        )
         st.dataframe(styled, use_container_width=True)
 else:
     st.markdown("### ✅ Potential BUY Opportunities")
-    styled = df.style.background_gradient(
-        subset=["RSI", "Target Upside %"], cmap="RdYlGn_r"
-    ).format({"Close Price": "${:,.2f}", "RSI": "{:.1f}", "Target Upside %": "{:.1f}"})
+    styled = (
+        df.style.background_gradient(
+            subset=["RSI", "Target Upside %"], cmap="RdYlGn_r"
+        )
+        .format({
+            "Close Price": "${:,.2f}",
+            "RSI": "{:.1f}",
+            "Target Upside %": "{:.1f}",
+        })
+    )
     st.dataframe(styled, use_container_width=True)
 
-# ---- Display results ----
-df = get_signals()
-
-if df.empty:
-    st.warning("No stocks met the full BUY criteria, showing RSI values for all instead:")
-
-    rows = []
-    for symbol in SYMBOLS:
-        df_temp = yf.download(symbol, period="6mo", interval="1d", progress=False)
-        if df_temp.empty:
-            continue
-        df_temp["rsi"] = calc_rsi(df_temp["Close"])
-        last = df_temp.iloc[-1]
-        rows.append({
-            "Symbol": symbol,
-            "Price": round(last["Close"], 2),
-            "RSI": round(last["rsi"], 1)
-        })
-
-    if rows:
-        st.dataframe(pd.DataFrame(rows))
-else:
-    st.success("✅ Possible Buy Signals:")
-    st.dataframe(df)
-
-
 st.sidebar.markdown("### ⚙️ Settings")
-st.sidebar.caption("Reload once daily for fresh data.")
+st.sidebar.caption("Reload this page once a day after market close for the latest signals.")
 
-
-# --- End of app ---
-st.sidebar.info("🔁 Tip: reload this page each day to get fresh data.")
 
 
 
