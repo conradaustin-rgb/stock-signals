@@ -62,7 +62,15 @@ if df.empty:
         df_temp = yf.download(symbol, period="6mo", interval="1d", progress=False)
         if df_temp.empty:
             continue
-        df_temp["rsi"] = ta.momentum.RSIIndicator(close=df_temp["Close"], window=14).rsi()
+try:
+    close_series = df_temp["Close"]
+    if isinstance(close_series, pd.DataFrame):
+        close_series = close_series.iloc[:, 0]
+    df_temp["rsi"] = ta.momentum.RSIIndicator(close=close_series, window=14).rsi()
+except Exception as e:
+    st.warning(f"Could not compute RSI for {symbol}: {e}")
+    df_temp["rsi"] = None
+
         last = df_temp.iloc[-1]
         rows.append({"Symbol": symbol, "RSI": round(last["rsi"], 1), "Price": round(last["Close"], 2)})
 
