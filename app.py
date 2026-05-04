@@ -52,22 +52,55 @@ def get_signals():
 
     return pd.DataFrame(results)
 
-df = get_signals()
+def get_signals():
+    results = []
 
-info = yf.Ticker(symbol).info
-recommend = info.get("recommendationMean", None)
-target_price = info.get("targetMeanPrice", None)
-current_price = df["Close"].iloc[-1]
-if recommend and target_price:
-    upside = round(((target_price - current_price) / current_price) * 100, 1)
-else:
-    recommend, upside = None, None
+    for symbol in SYMBOLS:
+        try:
+            df = yf.download(symbol, period="6mo", interval="1d", progress=False)
+            if df.empty or "Close" not in df.columns:
+                continue
 
-if df.empty:
-    st.info("No strong buy signals today — all clear.")
-else:
-    st.success("✅ Possible Buy Signals:")
-    st.dataframe(df)
+            # ---- Technical indicators ----
+            df = df.dropna(subset=["Close"])
+            df["rsi"] = ta.momentum.RSIIndicator(close=df["Close"], window=14).rsi()
+            df["ma_short"] = df["Close"].rolling(SHORT_MA).mean()
+            df["ma_long"] = df["Close"].rolling(LONG_MA).mean()
+            df = df.dropna()
+            if df.empty:
+                continue
+            latest = df.iloc[-1]
+
+            # ---- Analyst data from Yahoo ----
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            recommend = info.get("recommendationMean", None)
+            target_price = info.get("targetMeanPrice", None)
+            current_price = latest["Close"]
+            if recommend and target_price:
+                upside = round(((target_price - current_price) / current_price) * 100, 1)
+            else:
+                recommend, upside = None, None
+
+            # ---- Combine technical + analyst filters ----
+            if (
+                latest["ma_short"] > latest["ma_long"]
+                and latest["rsi"] < 40
+                and latest["Close"] > latest["ma_short"]
+            ):
+                results.append({
+                    "Symbol": symbol,
+                    "Close Price": round(latest["Close"], 2),
+                    "RSI": round(latest["rsi"], 1),
+                    "Analyst Rating (1=Buy→5=Sell)": recommend,
+                    "Target Upside %": upside
+                })
+
+        except Exception as e:
+            st.warning(f"Skipped {symbol}: {e}")
+
+    return pd.DataFrame(results)
+
 
 # --- End of app ---
 st.sidebar.info("🔁 Tip: reload this page each day to get fresh data.")
