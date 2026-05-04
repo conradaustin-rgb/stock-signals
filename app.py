@@ -66,7 +66,16 @@ try:
     close_series = df_temp["Close"]
     if isinstance(close_series, pd.DataFrame):
         close_series = close_series.iloc[:, 0]
-    df_temp["rsi"] = ta.momentum.RSIIndicator(close=close_series, window=14).rsi()
+def calc_rsi(series, period=14):
+    delta = series.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(period).mean()
+    avg_loss = loss.rolling(period).mean()
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+df_temp["rsi"] = calc_rsi(df_temp["Close"])
 except Exception as e:
     st.warning(f"Could not compute RSI for {symbol}: {e}")
     df_temp["rsi"] = None
